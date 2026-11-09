@@ -1,0 +1,62 @@
+name: Build unsigned test IPA
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Sources/**"
+      - "*.swift"
+      - "*.gpx"
+      - "project.yml"
+      - ".github/workflows/build-unsigned-ipa.yml"
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Run unit tests
+        run: |
+          xcodebuild test \
+            -project LocationAltitudeTester.xcodeproj \
+            -scheme LocationAltitudeTester \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Build device app without signing
+        run: |
+          xcodebuild build \
+            -project LocationAltitudeTester.xcodeproj \
+            -scheme LocationAltitudeTester \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$PWD/build/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Package IPA
+        run: |
+          mkdir -p build/Payload
+          cp -R build/DerivedData/Build/Products/Debug-iphoneos/LocationAltitudeTester.app build/Payload/
+          cd build
+          ditto -c -k --sequesterRsrc --keepParent Payload LocationAltitudeTester-unsigned.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocationAltitudeTester-unsigned
+          path: build/LocationAltitudeTester-unsigned.ipa
+          if-no-files-found: error
+
