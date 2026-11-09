@@ -1,4 +1,5 @@
 import CoreLocation
+import MapKit
 import SwiftUI
 
 final class SystemLocationObserver: NSObject, ObservableObject, CLLocationManagerDelegate {
@@ -53,10 +54,54 @@ final class SystemLocationObserver: NSObject, ObservableObject, CLLocationManage
 
 struct SystemLocationView: View {
     @StateObject private var observer = SystemLocationObserver()
+    @State private var expectedLatitude = 37.788440
+    @State private var expectedLongitude = 112.557732
+    @State private var expectedAltitude = 812.5
+    @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var hasCenteredOnFirstFix = false
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("地图验证") {
+                    Map(position: $cameraPosition) {
+                        Marker("期望位置", coordinate: expectedCoordinate)
+                            .tint(.orange)
+
+                        if let location = observer.location {
+                            Marker("系统位置", coordinate: location.coordinate)
+                                .tint(.blue)
+
+                            MapPolyline(coordinates: [expectedCoordinate, location.coordinate])
+                                .stroke(.red, lineWidth: 2)
+                        }
+                    }
+                    .mapStyle(.standard(elevation: .realistic))
+                    .frame(height: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    HStack {
+                        Button("查看期望点") {
+                            centerMap(on: expectedCoordinate)
+                        }
+
+                        Spacer()
+
+                        Button("查看系统点") {
+                            if let location = observer.location {
+                                centerMap(on: location.coordinate)
+                            }
+                        }
+                        .disabled(observer.location == nil)
+                    }
+                }
+
+                Section("期望值（WGS-84）") {
+                    numberField("期望纬度", value: $expectedLatitude)
+                    numberField("期望经度", value: $expectedLongitude)
+                    numberField("期望海拔（平均海平面，米）", value: $expectedAltitude)
+                }
+
                 Section("系统定位") {
                     LabeledContent("授权状态", value: authorizationText)
                     Button("请求权限并开始读取") {
@@ -68,6 +113,18 @@ struct SystemLocationView: View {
                 }
 
                 if let location = observer.location {
+                    Section("验证结果") {
+                        resultRow("水平误差", horizontalError(for: location), suffix: " m")
+                        resultRow("海拔误差", abs(location.altitude - expectedAltitude), suffix: " m")
+                        LabeledContent(
+                            "系统海拔是否有效",
+                            value: location.verticalAccuracy > 0 ? "有效" : "无效"
+                        )
+                        Text("蓝色为系统实际回调，橙色为期望点，红线为两者之间的水平误差。")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
                     LocationDetailsView(location: location)
                 } else {
                     Section {
@@ -84,10 +141,57 @@ struct SystemLocationView: View {
                 }
             }
             .navigationTitle("系统定位回调")
+            .onReceive(observer.$location.compactMap { $0 }) { location in
+                guard !hasCenteredOnFirstFix else { return }
+                hasCenteredOnFirstFix = true
+                centerMap(on: location.coordinate)
+            }
             .onDisappear {
                 observer.stop()
             }
         }
+    }
+
+    private var expectedCoordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(
+            latitude: min(max(expectedLatitude, -90), 90),
+            longitude: min(max(expectedLongitude, -180), 180)
+        )
+    }
+
+    private func horizontalError(for location: CLLocation) -> CLLocationDistance {
+        location.distance(
+            from: CLLocation(
+                latitude: expectedCoordinate.latitude,
+                longitude: expectedCoordinate.longitude
+            )
+        )
+    }
+
+    private func centerMap(on coordinate: CLLocationCoordinate2D) {
+        cameraPosition = .region(
+            MKCoordinateRegion(
+                center: coordinate,
+                latitudinalMeters: 1_000,
+                longitudinalMeters: 1_000
+            )
+        )
+    }
+
+    private func numberField(_ title: String, value: Binding<Double>) -> some View {
+        TextField(
+            title,
+            value: value,
+            format: .number.precision(.fractionLength(0...8))
+        )
+        .keyboardType(.numbersAndPunctuation)
+    }
+
+    private func resultRow(_ title: String, _ value: Double, suffix: String) -> some View {
+        LabeledContent(
+            title,
+            value: "\(value.formatted(.number.precision(.fractionLength(0...3))))\(suffix)"
+        )
     }
 
     private var authorizationText: String {
