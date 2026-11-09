@@ -10,7 +10,7 @@
 不需要服务器，也不依赖 WrapPin。代码注入用于确定性业务测试；`TestRoute.gpx` 用于 Xcode/Core Location 集成测试。App 包含两个页面：
 
 - **精确注入**：自行输入全部 CLLocation 字段并查看生成结果。
-- **系统回调**：读取 CLLocationManager 返回的真实或 Xcode GPX 定位，显示海拔、两种精度和 `isSimulatedBySoftware`。
+- **系统回调**：作为独立地图验证器，读取 CLLocationManager 返回的位置；地图同时显示期望点和系统点，并计算水平误差、海拔误差，显示两种精度和 `isSimulatedBySoftware`。
 
 ## 生成完整 Xcode 工程
 
