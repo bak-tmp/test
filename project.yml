@@ -1,0 +1,46 @@
+name: LocationAltitudeTester
+
+options:
+  bundleIdPrefix: io.localtest
+  deploymentTarget:
+    iOS: "18.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+
+targets:
+  LocationAltitudeTester:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: LocationSimulationHarness.swift
+      - path: TestRoute.gpx
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.localtest.location-altitude-tester
+        PRODUCT_NAME: LocationAltitudeTester
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: 定位海拔测试
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: 用于验证经纬度、海拔、精度和模拟定位标记。
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        CODE_SIGN_STYLE: Automatic
+    scheme:
+      testTargets:
+        - LocationAltitudeTesterTests
+
+  LocationAltitudeTesterTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: LocationSimulationHarnessTests.swift
+    dependencies:
+      - target: LocationAltitudeTester
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: io.localtest.location-altitude-tester.tests
+
