@@ -1,5 +1,6 @@
 import CoreLocation
 import XCTest
+@testable import LocationAltitudeTester
 
 final class LocationSimulationHarnessTests: XCTestCase {
     func testCreatesLocationWithEveryRequestedValue() throws {
